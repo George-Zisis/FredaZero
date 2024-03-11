@@ -14,7 +14,7 @@ When comparing actions it took much longer to train ~ 2 minutes
 
 Implementation of the vanilla MCTS algorithm for the game of chess
 
--5 runs with number of searches set to 100 and C to 2 takes 120 minutes to run with each game taking around 24 minutes to finish, an average of 105 plies and all games ending in a draw
+- 5 runs with number of searches set to 100 and C to 2 takes 120 minutes to run with each game taking around 24 minutes to finish, an average of 105 plies and all games ending in a draw
 
 If the game starts from initial state and takes 10 random plies:
 
@@ -32,7 +32,7 @@ There are a lot of the same moves picked over and over again from MCTS
 
 The board is cycling through the same states over and over again
 
--Run the game for ten steps starting from a different state
+- Run the game for ten steps starting from a different state
 ```
 fen_26 = "2R2n2/Nqrp4/P2PP2R/pP2b3/2Bp3p/1pp1P1k1/2PP1N1p/2K3B1 w - - 0 1"
 
