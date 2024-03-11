@@ -1,4 +1,4 @@
-- ### Random chess games
+### Random chess games
 
 Run 100 games of chess, from the starting fen to a terminal state, choosing random actions
 
@@ -10,8 +10,7 @@ When comparing actions to stockfish's best action only 13.12% of the actions cho
 
 When comparing actions it took much longer to train ~ 2 minutes
 
-
-- ### Vanilla MCTS
+### Vanilla MCTS
 
 Implementation of the vanilla MCTS algorithm for the game of chess
 
