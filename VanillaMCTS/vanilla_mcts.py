@@ -10,7 +10,7 @@ class Node:
 		self.args = args
 		self.state = state
 		self.parent = parent
-		self.action_idx = 0
+		self.action_idx = action_idx
 		self.action_taken = action_taken
 
 		self.children = []
