@@ -3,10 +3,15 @@
 Chose six random fens for the evaluation, with different numbers of pieces for each fen
 ```
 fen_26 = "2R2n2/Nqrp4/P2PP2R/pP2b3/2Bp3p/1pp1P1k1/2PP1N1p/2K3B1 w - - 0 1"
+
 fen_22 = "2R5/P1r3p1/2bq1PQ1/7K/P1p4b/BPk1pr1P/1p1N2P1/3B4 w - - 0 1"
+
 fen_16 = "8/2P2p2/2P1P3/1k3P2/1p4B1/2q3Q1/Kp2r1P1/R3N3 w - - 0 1"
+
 fen_12 = "2N5/2KBp1P1/7n/4B3/3N4/1R4r1/6kP/8 w - - 0 1"
+
 fen_8 = "3k4/8/6R1/5Pr1/4K3/8/P3P3/N7 w - - 0 1"
+
 fen_4 = "7r/8/7P/1K1k4/8/8/8/8 w - - 0 1"
 ```
 The evaluation was performed with 100, 1000 and 10000 number of tree searches
