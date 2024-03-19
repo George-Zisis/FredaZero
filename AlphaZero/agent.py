@@ -1,52 +1,57 @@
 import numpy as np
-
 import state_mod
 import random
-import torch
 
+import torch 
 import torch.nn as nn
 import torch.nn.functional as F
 
 from tqdm import trange
-from mcts_alpha import Node, AlphaMCTS
+from mcts_alpha import AlphaMCTS
+from policy_mod import get_policy, get_dirichlet_policy
 
 
 class AlphaZero:
-	def __init__(self, game, args, model, optimizer):
-		self.game = game
+	def __init__(self, game, args, model, optimizer, device): 
+		self.game = game 
 		self.args = args 
+
 		self.model = model
 		self.optimizer = optimizer
-		self.mcts = AlphaMCTS(game, args, model)
 
-	def self_play(self):
+		self.mcts = AlphaMCTS(game, args, model, device)
+
+		self.device = device
+
+	def selfplay(self):
 		memory = []
-		self.game.new_game()
-		state = self.game.get_fen_state()
+
+		state = self.game.new_game()
 
 		while True:
-			value, is_terminal = self.game.get_value_and_terminated(state)
+			reward, terminated = self.game.game_over(state)
 
-			if not is_terminal:
-				action_probs = self.mcts.search(state)
-				policy = self.game.correct_policy(action_probs)		
-				memory.append((state, policy))
-
-			if is_terminal:
+			if terminated:
 				return_memory = []
-				for hist_state, hist_action_probs in memory:
-					hist_outcome = value
-					hist_state = state_mod.get_state_board(hist_state, self.game.is_flip(hist_state))
-					return_memory.append((hist_state, hist_action_probs, hist_outcome))
+				for hist_state, hist_probs in memory:
+					hist_reward = reward
+					return_memory.append((hist_state, hist_probs, hist_reward))
 				return return_memory
 
-			temperature = action_probs ** (1 / self.args['temperature'])
-			temperature = temperature / np.sum(temperature)
-			
-			action = np.random.choice(list(self.game.board.legal_moves), p=temperature)
+			action_probs = self.mcts.search(state)
 
-			self.game.board.push(action)
-			state = self.game.get_fen_state()
+			policy = self.game.valid_to_all_actions(state, action_probs)
+
+			memory.append((state_mod.get_state_board(state, flip=False), policy))
+
+			action_probs = action_probs ** (1 / self.args['temperature'])
+			action_probs = action_probs / np.sum(action_probs)
+
+			valid_actions = self.game.get_valid_actions(state)
+
+			action = np.random.choice(valid_actions, p=action_probs)
+
+			state = self.game.get_next_state(state, action)
 
 	def train(self, memory):
 		random.shuffle(memory)
@@ -78,14 +83,12 @@ class AlphaZero:
 			memory = []
 
 			self.model.eval()
-			for self_play_iteration in trange(self.args['num_self_play_iterations']):
-				print(f"Iteration: {iteration} / Self-Played Games: {self_play_iteration}")
-				memory += self.self_play()
+			for sp_iteration in trange(self.args['num_self_play_iterations']):
+				memory += self.selfplay()
 
 			self.model.train()
-			for epoch in range(self.args['num_epochs']):
-				print(f"In training, epoch: {epoch}")
+			for epoch in trange(self.args['num_epochs']):
 				self.train(memory)
 
-			torch.save(self.model.state_dict(), f"saved_model_{iteration}.pt")
-			torch.save(self.optimizer.state_dict(), f"saved_optimizer_{iteration}.pt")
+			torch.save(self.model.state_dict(), f"v5/saved_model_{iteration}.pt")
+			torch.save(self.optimizer.state_dict(), f"v5/saved_optimizer_{iteration}.pt")
