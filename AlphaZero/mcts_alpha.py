@@ -2,14 +2,15 @@ import numpy as np
 
 import state_mod
 import torch
-import chess 
 import math
+
+from policy_mod import get_policy, get_dirichlet_policy
 
 from tqdm import trange
 
 
 class Node:
-	def __init__(self, game, args, state, prior=0, parent=None, action_taken=None, action_idx=None, visit_count=0):
+	def __init__(self, game, args, state, prior=0, parent=None, action_taken=None, action_idx=0, visit_count=0):
 		self.game = game
 		self.args = args
 		self.state = state
@@ -46,16 +47,16 @@ class Node:
 		return q_value + self.args['C'] * (math.sqrt(self.visit_count) / (child.visit_count + 1)) * child.prior
 
 	def expand(self, policy):
-		all_moves_str, all_moves_int = self.game.get_move_table()
-		for idx, prob in enumerate(policy):
+		policy = policy[policy!=0]
+
+		valid_actions = self.game.get_valid_actions(self.state)
+
+		for action_idx, prob in enumerate(policy):
 			if prob > 0:
-				action = all_moves_str[idx]
-				action_idx = self.game.get_valid_moves().index(action)
-				self.game.board.push(chess.Move.from_uci(action))
-				child = Node(self.game, self.args, self.game.board.fen(), prob, self, action, action_idx)
+				action = valid_actions[action_idx]
+				state = self.game.get_next_state(self.state, action)
+				child = Node(self.game, self.args, state, prob, self, action, action_idx)
 				self.children.append(child)
-				self.game.new_game()
-				self.game.board.set_fen(self.state)
 
 	def backpropagate(self, value):
 		self.value_sum += value
@@ -66,58 +67,40 @@ class Node:
 
 
 class AlphaMCTS:
-	def __init__(self, game, args, model):
+	def __init__(self, game, args, model, device):
 		self.game = game
 		self.args = args
 		self.model = model
-
-	def get_policy_and_value(self, node):
-		board_state = state_mod.get_state_board(node.state, flip=self.game.is_flip(node.state))
-		policy, value = self.model(torch.tensor(board_state, device=self.model.device).unsqueeze(0))
-		# Process Policy
-		policy = torch.softmax(policy, axis=1).squeeze(0).detach().cpu().numpy()
-		all_moves_str, all_moves_int = self.game.get_move_table()
-		policy = policy * all_moves_int
-		policy = policy / np.sum(policy)
-		# Process Value
-		value = value.item()
-		return policy, value
-
-	def add_noise(self, node):
-		board_state = state_mod.get_state_board(node.state, flip=self.game.is_flip(node.state))
-		policy, value = self.model(torch.tensor(board_state, device=self.model.device).unsqueeze(0))
-		policy = torch.softmax(policy, axis=1).squeeze(0).detach().cpu().numpy()
-		policy = ((1 - self.args['dirichlet_epsilon']) * policy + self.args['dirichlet_epsilon'] *
-			np.random.dirichlet([self.args['dirichlet_alpha']] * self.game.get_all_action_size()))
-		all_moves_str, all_moves_int = self.game.get_move_table()
-		policy = policy * all_moves_int
-		policy = policy / np.sum(policy)
-		node.expand(policy)
+		self.device = device
 
 	@torch.no_grad
 	def search(self, state):
 		root = Node(self.game, self.args, state, visit_count=1)
-		self.add_noise(root)
+
+		policy, _ = get_dirichlet_policy(self.game, self.model, state, self.device, 
+			dirichlet_epsilon=self.args['dirichlet_epsilon'], dirichlet_alpha=self.args['dirichlet_alpha'])
+
+		root.expand(policy)
+
 		for search in trange(self.args['num_searches']):
 			node = root
+
 			while node.is_fully_expanded():
 				node = node.select()
-				self.game.board.push(chess.Move.from_uci(node.action_taken))
 
-			value, is_terminal = self.game.get_value_and_terminated(node.state)
+			value, is_terminal = self.game.game_over(node.state)
 
 			if not is_terminal:
-				policy, value = self.get_policy_and_value(node)
+				policy, value = get_policy(self.game, self.model, node.state, self.device)
 				node.expand(policy)
 
 			node.backpropagate(value)
 
-			# Reset the game to initial state
-			self.game.new_game()
-			self.game.board.set_fen(state)
-
 		action_probs = np.zeros(len(root.children))
+
 		for child in root.children:
 			action_probs[child.action_idx] = child.visit_count
+
 		action_probs = action_probs / np.sum(action_probs)
+
 		return action_probs
